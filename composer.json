@@ -1,0 +1,23 @@
+{
+  "name": "vertilia/filesystem",
+  "description": "Filesystem helpers",
+  "license": "BSD-2-Clause",
+  "type": "library",
+  "autoload": {
+    "exclude-from-classmap": [
+      "/tests/"
+    ],
+    "psr-4": {
+      "Vertilia\\Filesystem\\": "src/"
+    }
+  },
+  "config": {
+    "optimize-autoloader": true,
+    "platform": {
+      "php": "7.4"
+    }
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^9.5"
+  }
+}
