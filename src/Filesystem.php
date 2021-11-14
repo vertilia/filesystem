@@ -36,45 +36,27 @@ class Filesystem
     }
 
     /**
-     * @param string $external_symlink_dir
-     * @param string $local_symlink_dir
-     * @param int $local_symlink_ttl
+     * @param string $src_symlink_dir
+     * @param string $trg_symlink_dir
+     * @param int $trg_symlink_ttl
      * @param int $lock_ttl
      * @return bool
      * @throws \RuntimeException
      */
-    public static function symlinkDirectorySync($external_symlink_dir, $local_symlink_dir, $local_symlink_ttl = 600, $lock_ttl = 60)
+    public static function syncSymlinkDir($src_symlink_dir, $trg_symlink_dir, $trg_symlink_ttl = 600, $lock_ttl = 60)
     {
-        // verify current symlink timestamp
-        $local_ts = filemtime($local_symlink_dir);
-
         $current_time = time();
 
+        // verify current symlink timestamp
+
         // quick exit path: return true if fresh symlink
-        if ($current_time - $local_symlink_ttl < $local_ts) {
+        if ($current_time - $trg_symlink_ttl < filemtime($trg_symlink_dir)) {
             return true;
         }
 
-        // exit path: if external symlink == local symlink
-        $local_symlink = $local_symlink_dir;
-        clearstatcache(true, $external_symlink_dir);
-        clearstatcache(true, $local_symlink);
-        $ext_link = readlink($external_symlink_dir);
-        $loc_link = readlink($local_symlink);
-        if ($ext_link === $loc_link) {
-            touch($local_symlink);
-            return true;
-        }
+        // lock before accessing shared symlink dir
 
-        // exit path: verify error codes on symlinks
-        if (false === $ext_link or false === $loc_link) {
-            throw new \RuntimeException("Error reading external or local symlink target");
-        }
-
-        // at this point we know that local symlink and external symlink point at different targets
-        // to copy the folder locally we need a lock
-
-        $lock_filename = sprintf("%s.lck", realpath($local_symlink));
+        $lock_filename = sprintf("%s.lck", realpath($trg_symlink_dir));
 
         if ($lock_fh = @fopen($lock_filename, 'x')) {
             // lock file created
@@ -84,11 +66,33 @@ class Filesystem
             // lock file exists but too old
             // delete it
             @unlink($lock_filename);
-            throw new \RuntimeException("Local lock file expired TTL of {$lock_ttl} seconds. Deleting.");
+            throw new \RuntimeException("Local lock file expired TTL of $lock_ttl seconds. Deleting.");
         } else {
             // lock file exists (operation carried out by different process)
             return true;
         }
+
+        // we are the only process at this moment to access shared symlink dir from this host
+
+        // verify symlinks targets
+
+        $ext_link = readlink($src_symlink_dir);
+        $loc_link = readlink($trg_symlink_dir);
+
+        // exit path: verify error codes on symlinks
+        if (false === $ext_link or false === $loc_link) {
+            throw new \RuntimeException('Error reading external or local symlink target');
+        }
+
+        // exit path: if external symlink == local symlink
+        if ($ext_link === $loc_link) {
+            touch($trg_symlink_dir, $current_time);
+            clearstatcache(true, $trg_symlink_dir);
+            return true;
+        }
+
+        // at this point we know that local symlink and external symlink point at different targets
+        // to copy the folder locally we need a lock
 
         // we acquired a lock for directory copy
 
@@ -97,8 +101,8 @@ class Filesystem
         exec(
             sprintf(
                 'cp -r %s %s',
-                escapeshellarg(realpath($external_symlink_dir)),
-                escapeshellarg(dirname(realpath($local_symlink_dir)).'/')
+                escapeshellarg(realpath($src_symlink_dir)),
+                escapeshellarg(dirname(realpath($trg_symlink_dir)).'/')
             ),
             $a,
             $error_code
@@ -113,11 +117,12 @@ class Filesystem
             sprintf(
                 'ln -snf %s %s',
                 escapeshellarg($ext_link),
-                escapeshellarg($local_symlink_dir)
+                escapeshellarg($trg_symlink_dir)
             ),
             $a,
             $error_code
         );
+        clearstatcache(true, $trg_symlink_dir);
         @unlink($lock_filename);
         if ($error_code) {
             throw new \RuntimeException("Error ($error_code) changing local symlink");
