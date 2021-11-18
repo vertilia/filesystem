@@ -42,7 +42,7 @@ class FilesystemTest extends TestCase
 
         // create filesystem
         create_fs($root, $filesystem);
-        printf("setting %s to %s\n", "$root$trg_symlink", date('r', $trg_symlink_time));
+//        printf("setting %s to %s\n", "$root$trg_symlink", date('r', $trg_symlink_time));
         touch("$root$trg_symlink", $trg_symlink_time);
 
         $this->assertEquals($before, readlink("$root$trg_symlink"));
@@ -85,8 +85,8 @@ class FilesystemTest extends TestCase
         ];
 
         return [
-            [$filesystem, '/shared/release/current', '/local/release/current', time() - 120, 'v1.0.1', 'v1.0.1'],
-            [$filesystem, '/shared/release/current', '/local/release/current', time() - 1200, 'v1.0.1', 'v1.0.2'],
+            [$filesystem, '/shared/release/current', '/local/release/current', time() - 120, 'v1.0.0', 'v1.0.0'],
+            [$filesystem, '/shared/release/current', '/local/release/current', time() - 1200, 'v1.0.0', 'v1.0.1'],
         ];
     }
 }
